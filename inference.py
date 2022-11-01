@@ -149,7 +149,7 @@ class ExactInference(InferenceModule):
         pacmanPosition = gameState.getPacmanPosition()
 
         "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        # util.raiseNotDefined()
 
         # Replace this code with a correct observation update
         # Be sure to handle the "jail" edge case where the ghost is eaten
@@ -158,7 +158,20 @@ class ExactInference(InferenceModule):
         for p in self.legalPositions:
             trueDistance = util.manhattanDistance(p, pacmanPosition)
             if emissionModel[trueDistance] > 0:
-                allPossible[p] = 1.0
+                allPossible[p] = emissionModel[trueDistance] * self.beliefs[p]
+                # before I changed this line, all of my moves were producing the same
+                # inference, and I realized I needed to set unique values to each location
+                # based on the emission model
+
+        # if the distance is 0, then we know exactly where the ghost is,
+        # so there's only one legal location, so we set every possible location
+        # to 0, then set the jail as the only legal position. This works because
+        # there is a separate model for each ghost.
+        if noisyDistance == None:
+            for p in self.legalPositions:            
+                allPossible[p] = 0
+            allPossible[self.getJailPosition()] = 1
+
 
         "*** END YOUR CODE HERE ***"
 
