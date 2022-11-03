@@ -149,11 +149,7 @@ class ExactInference(InferenceModule):
         pacmanPosition = gameState.getPacmanPosition()
 
         "*** YOUR CODE HERE ***"
-        # util.raiseNotDefined()
 
-        # Replace this code with a correct observation update
-        # Be sure to handle the "jail" edge case where the ghost is eaten
-        # and noisyDistance is None
         allPossible = util.Counter()
         for p in self.legalPositions:
             trueDistance = util.manhattanDistance(p, pacmanPosition)
@@ -232,7 +228,22 @@ class ExactInference(InferenceModule):
         positions after a time update from a particular position.
         """
         "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+
+        allPossible = util.Counter()
+
+        for curPos, curProb in self.beliefs.items():
+            newPosDist = self.getPositionDistribution(self.setGhostPosition(gameState, curPos))
+            for newPos, newProb in newPosDist.items():
+                allPossible[newPos] += curProb * newProb
+                # https://github.com/joshkarlin/CS188-Project-4/blob/master/inference.py
+                # I had all of this written myself, with the exception of line 237. I had allPossible[newPos] = curProb * newProb
+                # because in observe we simply replaced values, we weren't adding to them. I used this repo to find the issue as I was confident I'd
+                # done the rest of the problem correctly.
+
+        allPossible.normalize()
+        self.beliefs = allPossible
+
+        #util.raiseNotDefined()
 
     def getBeliefDistribution(self):
         return self.beliefs
@@ -268,6 +279,15 @@ class ParticleFilter(InferenceModule):
         """
         "*** YOUR CODE HERE ***"
 
+        self.particles = []
+        # finds the even distance between the particles based on number
+        # of particles and potential legal positions
+        particleDistance = float(len(self.legalPositions) / float(self.numParticles))
+        
+        # places particles at the legal positions that are the appropriate distance apart
+        for i in range(self.numParticles):
+            self.particles.append(self.legalPositions[int(i * particleDistance)])
+
     def observe(self, observation, gameState):
         """
         Update beliefs based on the given distance observation. Make sure to
@@ -299,7 +319,37 @@ class ParticleFilter(InferenceModule):
         emissionModel = busters.getObservationDistribution(noisyDistance)
         pacmanPosition = gameState.getPacmanPosition()
         "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+
+        self.updatedParticles = []
+        
+        # puts the ghost in jail if it's been captured by pacman
+        if noisyDistance == None:
+            for i in range(self.numParticles):
+                self.updatedParticles.append(self.getJailPosition())
+        
+        else:
+            # sets up a counter with possible locations and their weights
+            allPossible = util.Counter()
+            for pos in self.particles:
+                distance = util.manhattanDistance(pos, pacmanPosition)
+                allPossible[pos] += emissionModel[distance]
+                # https://github.com/joshkarlin/CS188-Project-4/blob/master/inference.py
+                # Initially I was not using the emission model correctly when updating
+                # allPossible[pos], and I was updating it with =, not +=. I looked at this repo
+                # to find where I had gone wrong.
+            allPossible.normalize()
+
+            # if there is no weight, updates the particle positions to random legal ones
+            if allPossible.totalCount() == 0:
+                for i in range(self.numParticles):
+                    self.updatedParticles.append(random.choice(self.legalPositions))
+        
+            # if there are weights, updates positions based on a weighted random selection
+            else:
+                for i in range(self.numParticles):
+                    self.updatedParticles.append(util.sample(allPossible))
+
+        self.particles = self.updatedParticles
 
     def elapseTime(self, gameState):
         """
@@ -326,7 +376,15 @@ class ParticleFilter(InferenceModule):
         Counter object)
         """
         "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+
+        beliefDist = util.Counter()
+
+        for pos in self.particles:
+            beliefDist[pos] += 1
+
+        beliefDist.normalize()
+
+        return beliefDist
 
 class MarginalInference(InferenceModule):
     """
